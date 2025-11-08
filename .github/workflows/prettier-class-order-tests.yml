@@ -1,0 +1,189 @@
+name: Prettier Class Order Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'prettier-class-order-research/**'
+      - '.github/workflows/prettier-class-order-tests.yml'
+  pull_request:
+    paths:
+      - 'prettier-class-order-research/**'
+      - '.github/workflows/prettier-class-order-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test-class-ordering:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    name: Test RustyWind vs Prettier Plugin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-rustywind-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Setup WASM target
+        run: rustup target add wasm32-wasip1-threads
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build Tailwind CSS
+        run: pnpm run build
+        env:
+          CARGO_PROFILE_RELEASE_LTO: 'off'
+
+      - name: Install test dependencies
+        working-directory: prettier-class-order-research/test-suite
+        run: |
+          npm install -D prettier prettier-plugin-tailwindcss
+
+      - name: Install RustyWind
+        run: |
+          # Check if rustywind is already cached
+          if ! command -v rustywind &> /dev/null; then
+            echo "Installing rustywind..."
+            cargo install rustywind --locked
+          else
+            echo "Using cached rustywind"
+          fi
+
+      - name: Run comparison tests
+        id: tests
+        working-directory: prettier-class-order-research/test-suite
+        run: |
+          chmod +x run-comparison.sh
+          ./run-comparison.sh || echo "TESTS_FAILED=true" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            prettier-class-order-research/test-suite/results/
+          retention-days: 30
+
+      - name: Upload diff artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-diffs
+          path: |
+            prettier-class-order-research/test-suite/results/diffs/
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          cd prettier-class-order-research/test-suite
+          echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -d "results/diffs" ] && [ "$(ls -A results/diffs)" ]; then
+            DIFF_COUNT=$(ls -1 results/diffs | wc -l)
+            echo "⚠️ **$DIFF_COUNT test(s) failed**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Failed Tests" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            for diff in results/diffs/*.diff; do
+              if [ -f "$diff" ]; then
+                filename=$(basename "$diff" .diff)
+                echo "- ❌ \`$filename\`" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "📥 Download the \`test-diffs\` artifact to see detailed differences." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **All tests passed!**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "RustyWind sorting matches Prettier Plugin Tailwindcss perfectly." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- ~1,170 total test cases" >> $GITHUB_STEP_SUMMARY
+          echo "- All Tailwind utilities (layout, spacing, typography, etc.)" >> $GITHUB_STEP_SUMMARY
+          echo "- Arbitrary values (bg-[#fff], w-[100px], etc.)" >> $GITHUB_STEP_SUMMARY
+          echo "- All variants (responsive, pseudo-class, stacked)" >> $GITHUB_STEP_SUMMARY
+          echo "- v4 features (container queries, size utility, etc.)" >> $GITHUB_STEP_SUMMARY
+          echo "- Edge cases that break static list" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "See [TEST_COVERAGE_MATRIX.md](https://github.com/${{ github.repository }}/blob/${{ github.sha }}/prettier-class-order-research/test-suite/TEST_COVERAGE_MATRIX.md) for detailed coverage." >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment on PR (if failed)
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const diffsDir = 'prettier-class-order-research/test-suite/results/diffs';
+            let failedTests = [];
+
+            if (fs.existsSync(diffsDir)) {
+              failedTests = fs.readdirSync(diffsDir)
+                .filter(f => f.endsWith('.diff'))
+                .map(f => f.replace('.diff', ''));
+            }
+
+            const body = `## ⚠️ Prettier Class Order Tests Failed
+
+            ${failedTests.length} test(s) failed to match Prettier Plugin Tailwindcss sorting:
+
+            ${failedTests.map(t => `- ❌ \`${t}\``).join('\n')}
+
+            ### What this means
+
+            The comprehensive test suite compares RustyWind's class sorting against Prettier Plugin Tailwindcss (the canonical implementation). These failures indicate that RustyWind's sorting doesn't match Tailwind's official order.
+
+            ### Next steps
+
+            1. Download the \`test-diffs\` artifact from this workflow run
+            2. Review the diffs to see specific sorting differences
+            3. Update RustyWind's sorting logic to match
+
+            ### Current Status
+
+            - **Expected pass rate** with static list: ~60%
+            - **Target pass rate** with pattern-based implementation: ~99%
+
+            See [TEST_COVERAGE_MATRIX.md](https://github.com/${{ github.repository }}/blob/${{ github.sha }}/prettier-class-order-research/test-suite/TEST_COVERAGE_MATRIX.md) for details.
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Basic HTML Test</title>
+</head>
+<body>
+    <!-- Test 1: Basic utilities mixed order -->
+    <div class="p-4 bg-red-500 m-2 text-white flex">
+        Basic utilities
+    </div>
+
+    <!-- Test 2: Responsive variants -->
+    <div class="md:grid grid sm:flex flex lg:block block">
+        Responsive variants
+    </div>
+
+    <!-- Test 3: Pseudo-class variants -->
+    <div class="hover:bg-blue-500 bg-red-500 focus:text-white text-black active:scale-95">
+        Pseudo-class variants
+    </div>
+
+    <!-- Test 4: Mixed base and variants -->
+    <div class="mx-0 md:mx-8 px-4 sm:px-6 lg:px-8">
+        Mixed spacing
+    </div>
+
+    <!-- Test 5: Complex layout classes -->
+    <div class="grid-cols-3 gap-4 grid items-center justify-between flex-wrap flex">
+        Complex layout
+    </div>
+
+    <!-- Test 6: Sizing utilities -->
+    <div class="h-screen w-full max-w-7xl min-h-0">
+        Sizing
+    </div>
+
+    <!-- Test 7: Typography -->
+    <p class="font-bold text-lg leading-relaxed text-center tracking-wide">
+        Typography test
+    </p>
+
+    <!-- Test 8: Borders and radius -->
+    <div class="border-gray-300 border-2 border rounded-lg shadow-md">
+        Borders
+    </div>
+
+    <!-- Test 9: Positioning -->
+    <div class="absolute top-0 right-0 z-10 inset-0">
+        Positioning
+    </div>
+
+    <!-- Test 10: Important modifier -->
+    <div class="p-4! bg-red-500 m-2!">
+        Important modifiers
+    </div>
+
+    <!-- Test 11: Arbitrary values -->
+    <div class="bg-[#1da1f2] w-[100px] m-[10px] p-[2rem]">
+        Arbitrary values
+    </div>
+
+    <!-- Test 12: Multiple variants stacked -->
+    <div class="hover:focus:bg-blue-500 md:hover:flex lg:focus:grid">
+        Multiple stacked variants
+    </div>
+
+    <!-- Test 13: Unknown classes mixed with Tailwind -->
+    <div class="custom-class flex unknown-utility p-4 my-component">
+        Unknown classes
+    </div>
+
+    <!-- Test 14: All margin directions -->
+    <div class="m-4 mx-8 my-2 mt-1 mr-3 mb-5 ml-7">
+        All margin directions
+    </div>
+
+    <!-- Test 15: Color utilities -->
+    <div class="bg-red-500 text-white border-blue-300">
+        Colors
+    </div>
+</body>
+</html>
